@@ -1,6 +1,7 @@
 """Keep every channel's stream link working without anyone touching it.
 
-Runs hourly from .github/workflows/streams.yml. For each channel it tries, in order: the link in use
+Runs hourly from .github/workflows/streams.yml. GitHub's runners are outside Turkey, so a channel that is
+geo-blocked abroad (TRT 1 during some matches) looks broken from there; the last link is then kept. For each channel it tries, in order: the link in use
 now, links found on the channel's own live page, and links from the community iptv-org list. A link
 counts as working when its playlist and newest video segment download, and no host on the way uses a
 Let's Encrypt certificate (the TV's 2017 browser rejects those). Links carrying an expiry (`e=` epoch,
@@ -22,6 +23,8 @@ UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chr
 IPTV_ORG = "https://iptv-org.github.io/iptv/countries/tr.m3u"
 # Replace expiring links this long before they run out; the job runs hourly.
 EXPIRY_MARGIN = 2 * 3600
+# Only the broadcasters' own CDNs: the iptv-org list also carries third-party restreams we don't want.
+OFFICIAL_HOSTS = (".trt.com.tr", ".daioncdn.net", ".ercdn.net", ".duhnet.tv")
 
 # preferred: the link to use while it works (1080p where the broadcaster offers a fixed one; otherwise
 # the full playlist so the TV can pick up to 1080p). page/page_host: where to look for a fresh link.
@@ -98,7 +101,8 @@ def media_lines(body):
 def works(url):
     """True when the playlist, its best rendition and the newest segment all download from trusted hosts."""
     try:
-        if expires_soon(url) or not tv_trusts(url):
+        host = urllib.parse.urlparse(url).hostname or ""
+        if not host.endswith(OFFICIAL_HOSTS) or expires_soon(url) or not tv_trusts(url):
             return False
         final, body = get(url)
         if b"#EXTM3U" not in body:
