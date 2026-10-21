@@ -121,8 +121,12 @@ function imgTest(table, key, url) {
   setTimeout(function () { set('TIMEOUT', 'no'); }, 15000);
   img.src = url + (url.indexOf('?') < 0 ? '?' : '&') + 't=' + new Date().getTime();
 }
-imgTest('t2', 'Reach youtube.com', 'https://www.youtube.com/favicon.ico');
-imgTest('t2', 'Reach Let\'s Encrypt site', 'https://letsencrypt.org/favicon.ico');
+// Each probe uses a site whose certificate chains to a different root, so we learn which the TV trusts.
+imgTest('t2', 'youtube (GlobalSign)', 'https://www.youtube.com/favicon.ico');
+imgTest('t2', 'atv (GoDaddy G2)', 'https://www.atv.com.tr/favicon.ico');
+imgTest('t2', 'showtv (DigiCert G2)', 'https://www.showtv.com.tr/favicon.ico');
+imgTest('t2', 'Let\'s Encrypt (ISRG X1)', 'https://letsencrypt.org/favicon.ico');
+imgTest('t2', 'github.io (new LE root)', 'https://serialseller.github.io/tv/media/probe.png');
 
 // Video playback: did each video actually advance?
 function watch(id, statusId) {
