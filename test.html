@@ -3,149 +3,116 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TV Test</title>
+<title>TV Test 2</title>
 <style>
   /* Written for very old TV browsers: no flexbox, no CSS variables, no modern JS. */
   html, body { margin: 0; padding: 0; background: #111; color: #eee; font-family: Arial, Helvetica, sans-serif; }
-  body { padding: 16px 24px; font-size: 18px; }
-  h1 { margin: 0 0 6px 0; font-size: 28px; color: #fff; }
-  .sub { color: #aaa; font-size: 16px; margin-bottom: 10px; }
-  .col { float: left; width: 49%; margin-right: 1%; }
+  body { padding: 16px 24px; font-size: 22px; }
+  h1 { margin: 0 0 6px 0; font-size: 30px; color: #fff; }
+  .sub { color: #aaa; font-size: 18px; margin-bottom: 12px; }
+  #player { float: left; width: 46%; }
+  video { width: 100%; height: 300px; background: #000; }
+  #now { font-size: 22px; margin-top: 6px; color: #fd4; }
+  #side { float: right; width: 51%; }
   table { width: 100%; border-collapse: collapse; }
-  td { padding: 3px 6px; border-bottom: 1px solid #333; vertical-align: top; }
-  td.k { color: #9ab; width: 46%; }
+  td { padding: 6px 8px; border-bottom: 1px solid #333; }
+  td.k { color: #9ab; width: 40%; }
   .ok { color: #4f4; font-weight: bold; }
   .no { color: #f55; font-weight: bold; }
   .maybe { color: #fd4; font-weight: bold; }
-  .box { clear: both; padding-top: 10px; }
-  .vids div { float: left; width: 31%; margin-right: 2%; }
-  video { width: 100%; height: 150px; background: #000; }
-  .lbl { font-size: 16px; color: #ccc; }
-  .ua { font-size: 14px; color: #ccc; word-wrap: break-word; }
-  #keys { font-size: 22px; color: #fd4; }
+  #keybox { clear: both; padding-top: 16px; }
+  #keys { font-size: 30px; color: #fd4; }
 </style>
 </head>
 <body>
-<h1>TV Browser Test</h1>
-<div class="sub">Wait ~20 seconds for the videos to try playing, then take ONE photo of the whole screen. Press remote buttons (arrows, OK, Back, colours) to see their codes.</div>
+<h1>TV Browser Test 2: one video at a time</h1>
+<div class="sub">The TV can only play one video at once, so this plays them one after another (about 40 seconds). When the yellow line says DONE, press some remote buttons and take ONE photo.</div>
 
-<div class="col">
-  <table id="t1"></table>
+<div id="player">
+  <video id="v" muted></video>
+  <div id="now">starting</div>
 </div>
-<div class="col">
-  <table id="t2"></table>
-</div>
-
-<div class="box vids">
-  <div><video id="v1" muted autoplay loop src="media/h264.mp4"></video><div class="lbl">MP4 / H.264: <span id="s1" class="maybe">waiting</span></div></div>
-  <div><video id="v2" muted autoplay loop src="media/vp8.webm"></video><div class="lbl">WebM / VP8: <span id="s2" class="maybe">waiting</span></div></div>
-  <div><video id="v3" muted autoplay></video><div class="lbl">HLS live stream: <span id="s3" class="maybe">waiting</span></div></div>
+<div id="side">
+  <table id="t"></table>
 </div>
 
-<div class="box">
-  <div>Remote keys: <span id="keys">press a button</span></div>
-  <div class="ua" id="ua"></div>
+<div id="keybox">
+  Remote keys: <span id="keys">press arrows, OK, Back, Red, Green, Yellow, Blue</span>
 </div>
 
 <script>
-var HLS_URL = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
+var TESTS = [
+  { name: 'MP4 / H.264', src: 'media/h264.mp4' },
+  { name: 'WebM / VP8', src: 'media/vp8.webm' },
+  { name: 'HLS live (HD)', src: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8' }
+];
+var SECONDS = 12;
 
 function el(id) { return document.getElementById(id); }
+function text(node, s) { node.innerHTML = ''; node.appendChild(document.createTextNode(s)); }
 
-function row(table, key, value, cls) {
+function addRow(name) {
   var tr = document.createElement('tr');
   var a = document.createElement('td');
   var b = document.createElement('td');
   a.className = 'k';
-  a.appendChild(document.createTextNode(key));
-  b.className = cls || '';
-  b.appendChild(document.createTextNode(String(value)));
+  text(a, name);
+  b.className = 'maybe';
+  text(b, 'waiting');
   tr.appendChild(a);
   tr.appendChild(b);
-  el(table).appendChild(tr);
+  el('t').appendChild(tr);
+  return b;
 }
 
-function yesno(table, key, test) {
-  var v;
-  try { v = !!test(); } catch (e) { v = false; }
-  row(table, key, v ? 'YES' : 'NO', v ? 'ok' : 'no');
+// Frames the decoder actually produced; a frozen picture with moving audio shows up as a low number.
+function frames(v) {
+  if (typeof v.webkitDecodedFrameCount === 'number') { return v.webkitDecodedFrameCount; }
+  if (v.getVideoPlaybackQuality) { return v.getVideoPlaybackQuality().totalVideoFrames; }
+  return -1;
 }
 
-function canPlay(table, key, mime) {
-  var r = '';
-  try { r = document.createElement('video').canPlayType(mime); } catch (e) { r = 'error'; }
-  row(table, key, r === '' ? 'NO' : r, r === 'probably' ? 'ok' : (r === 'maybe' ? 'maybe' : 'no'));
-}
+var cells = [];
+for (var i = 0; i < TESTS.length; i++) { cells.push(addRow(TESTS[i].name)); }
 
-function mse(table, key, mime) {
-  var r = false;
-  try { r = !!(window.MediaSource && window.MediaSource.isTypeSupported(mime)); } catch (e) {}
-  row(table, key, r ? 'YES' : 'NO', r ? 'ok' : 'no');
-}
-
-// Screen and engine basics
-try {
-  row('t1', 'Screen', screen.width + ' x ' + screen.height);
-  row('t1', 'Window', (window.innerWidth || document.documentElement.clientWidth) + ' x ' + (window.innerHeight || document.documentElement.clientHeight));
-  row('t1', 'Pixel ratio', window.devicePixelRatio || 1);
-} catch (e) {}
-row('t1', 'Page over HTTPS', location.protocol === 'https:' ? 'YES' : 'NO (' + location.protocol + ')', location.protocol === 'https:' ? 'ok' : 'maybe');
-yesno('t1', 'JSON', function () { return window.JSON && JSON.parse('{"a":1}').a === 1; });
-yesno('t1', 'querySelector', function () { return document.querySelector; });
-yesno('t1', 'localStorage', function () { localStorage.setItem('t', '1'); return localStorage.getItem('t') === '1'; });
-yesno('t1', 'CSS flexbox', function () { var s = document.createElement('div').style; s.display = 'flex'; return s.display === 'flex'; });
-yesno('t1', 'CSS transitions', function () { var s = document.body.style; return 'transition' in s || 'webkitTransition' in s || 'OTransition' in s; });
-yesno('t1', 'Promise (newer JS)', function () { return typeof Promise === 'function'; });
-yesno('t1', 'fetch (newer JS)', function () { return typeof fetch === 'function'; });
-
-// Video capabilities
-yesno('t2', 'HTML5 video', function () { return document.createElement('video').canPlayType; });
-canPlay('t2', 'MP4 H.264', 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"');
-canPlay('t2', 'WebM VP8', 'video/webm; codecs="vp8"');
-canPlay('t2', 'WebM VP9', 'video/webm; codecs="vp9"');
-canPlay('t2', 'HLS native', 'application/vnd.apple.mpegurl');
-yesno('t2', 'MediaSource (MSE)', function () { return window.MediaSource || window.WebKitMediaSource; });
-mse('t2', 'MSE H.264', 'video/mp4; codecs="avc1.42E01E"');
-mse('t2', 'MSE VP9 (YouTube)', 'video/webm; codecs="vp9"');
-
-// Network: can the browser reach other sites over HTTPS (old certificate stores often fail)?
-function imgTest(table, key, url) {
-  var td;
-  row(table, key, 'checking', 'maybe');
-  td = el(table).lastChild.lastChild;
-  var img = new Image();
-  var done = false;
-  function set(text, cls) { if (done) { return; } done = true; td.firstChild.nodeValue = text; td.className = cls; }
-  img.onload = function () { set('YES', 'ok'); };
-  img.onerror = function () { set('NO', 'no'); };
-  setTimeout(function () { set('TIMEOUT', 'no'); }, 15000);
-  img.src = url + (url.indexOf('?') < 0 ? '?' : '&') + 't=' + new Date().getTime();
-}
-// Each probe uses a site whose certificate chains to a different root, so we learn which the TV trusts.
-imgTest('t2', 'youtube (GlobalSign)', 'https://www.youtube.com/favicon.ico');
-imgTest('t2', 'atv (GoDaddy G2)', 'https://www.atv.com.tr/favicon.ico');
-imgTest('t2', 'showtv (DigiCert G2)', 'https://www.showtv.com.tr/favicon.ico');
-imgTest('t2', 'Let\'s Encrypt (ISRG X1)', 'https://letsencrypt.org/favicon.ico');
-imgTest('t2', 'github.io (new LE root)', 'https://serialseller.github.io/tv/media/probe.png');
-
-// Video playback: did each video actually advance?
-function watch(id, statusId) {
-  var v = el(id), s = el(statusId);
-  function set(text, cls) { s.firstChild.nodeValue = text; s.className = cls; }
-  try {
-    v.onerror = function () { set('ERROR', 'no'); };
-    v.onplaying = function () { set('PLAYING', 'ok'); };
-    if (v.play) { try { v.play(); } catch (e) {} }
-  } catch (e) { set('NO VIDEO', 'no'); return; }
+function run(i) {
+  if (i >= TESTS.length) {
+    var v0 = el('v');
+    try { v0.pause(); v0.removeAttribute('src'); v0.load(); } catch (e) {}
+    text(el('now'), 'DONE - press remote buttons, then take the photo');
+    return;
+  }
+  var v = el('v');
+  var cell = cells[i];
+  var failed = false;
+  text(el('now'), 'Now testing: ' + TESTS[i].name);
+  text(cell, 'testing');
+  v.onerror = function () { failed = true; };
+  v.src = TESTS[i].src;
+  try { v.load(); v.play(); } catch (e) {}
   setTimeout(function () {
-    if (s.className === 'ok') { return; }
-    if (v.currentTime > 0.5) { set('PLAYING', 'ok'); } else if (s.className !== 'no') { set('NOT PLAYING', 'no'); }
-  }, 18000);
+    var t = v.currentTime || 0;
+    var f = frames(v);
+    var secs = Math.round(t * 10) / 10;
+    var fps = f >= 0 && t > 0 ? Math.round(f / t) : -1;
+    var msg, cls;
+    if (failed || t < 0.5) {
+      msg = 'FAILED' + (v.error ? ' (code ' + v.error.code + ')' : '');
+      cls = 'no';
+    } else if (fps >= 0 && fps < 10) {
+      msg = 'FROZEN picture: ' + secs + 's, ' + fps + ' fps';
+      cls = 'no';
+    } else {
+      msg = 'OK: ' + secs + 's' + (fps >= 0 ? ', ' + fps + ' fps' : '');
+      cls = 'ok';
+    }
+    text(cell, msg);
+    cell.className = cls;
+    try { v.pause(); } catch (e) {}
+    setTimeout(function () { run(i + 1); }, 1000);
+  }, SECONDS * 1000);
 }
-el('v3').src = HLS_URL;
-watch('v1', 's1');
-watch('v2', 's2');
-watch('v3', 's3');
+run(0);
 
 // Remote key codes, so the dashboard can map the colour buttons and Back.
 var seen = [];
@@ -153,16 +120,13 @@ document.onkeydown = function (e) {
   e = e || window.event;
   var code = e.keyCode || e.which;
   seen.push(code);
-  if (seen.length > 10) { seen.shift(); }
-  el('keys').firstChild.nodeValue = seen.join('  ');
-  // Keep arrows from scrolling the page away from the results.
+  if (seen.length > 12) { seen.shift(); }
+  text(el('keys'), seen.join('  '));
   if (code >= 37 && code <= 40) {
     if (e.preventDefault) { e.preventDefault(); }
     return false;
   }
 };
-
-el('ua').appendChild(document.createTextNode('UA: ' + navigator.userAgent));
 </script>
 </body>
 </html>

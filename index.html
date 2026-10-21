@@ -21,7 +21,8 @@
     border: 5px solid transparent; overflow: hidden;
   }
   .tile span { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 14px 0; text-align: center; font-size: 34px; font-weight: bold; }
-  .tile.on { border-color: #ffffff; }
+  /* The TV browser can drive the page with an on-screen pointer instead of arrow keys, so hover and focus highlight too. */
+  .tile.on, .tile:hover, .tile:focus { border-color: #ffffff; outline: none; }
   #hint { position: absolute; left: 4%; bottom: 3%; font-size: 24px; color: #8a93a0; }
 </style>
 </head>
@@ -48,7 +49,8 @@ var TILES = [
   { name: 'NOW',      color: '#d4145a', url: 'https://www.nowtv.com.tr/canli-yayin' },
   { name: 'TV8',      color: '#2e7d32', url: 'https://www.tv8.com.tr/canli-yayin' },
   { name: 'NTV',      color: '#37474f', url: 'https://www.ntv.com.tr/canli-yayin/ntv' },
-  { name: 'TRT Haber',color: '#00838f', url: 'https://www.trthaber.com/canli-yayin-izle.html' }
+  // trthaber.com uses a Let's Encrypt certificate this TV rejects, so go through tabii instead.
+  { name: 'TRT Haber',color: '#00838f', url: 'https://www.tabii.com/tr/watch/live/trthaber' }
 ];
 var COLS = 5;
 
