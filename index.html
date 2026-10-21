@@ -37,21 +37,13 @@
 </div>
 <div id="hint">Oku kutunun üstüne getirin ve OK'a basın. Geri dönmek için Back / Geri tuşu.</div>
 
+<script src="channels.js"></script>
 <script>
-// Each tile opens the channel's own live page in this browser.
-var TILES = [
-  { name: 'YouTube',  color: '#e62117', url: 'https://www.youtube.com/tv' },
-  { name: 'TRT 1',    color: '#1d4fa3', url: 'https://www.tabii.com/tr/watch/live/trt1' },
-  { name: 'ATV',      color: '#c8102e', url: 'https://www.atv.com.tr/canli-yayin' },
-  { name: 'Show TV',  color: '#e85d04', url: 'https://www.showtv.com.tr/canli-yayin' },
-  { name: 'Kanal D',  color: '#0a6ebd', url: 'https://www.kanald.com.tr/canli-yayin' },
-  { name: 'Star TV',  color: '#6a1b9a', url: 'https://www.startv.com.tr/canli-yayin' },
-  { name: 'NOW',      color: '#d4145a', url: 'https://www.nowtv.com.tr/canli-yayin' },
-  { name: 'TV8',      color: '#2e7d32', url: 'https://www.tv8.com.tr/canli-yayin' },
-  { name: 'NTV',      color: '#37474f', url: 'https://www.ntv.com.tr/canli-yayin/ntv' },
-  // trthaber.com uses a Let's Encrypt certificate this TV rejects, so go through tabii instead.
-  { name: 'TRT Haber',color: '#00838f', url: 'https://www.tabii.com/tr/watch/live/trthaber' }
-];
+// Channels open in our own light player; YouTube opens its TV site.
+var TILES = [];
+for (var c = 0; c < CHANNELS.length; c++) {
+  TILES.push({ name: CHANNELS[c].name, color: CHANNELS[c].color, url: CHANNELS[c].stream ? 'watch.html#' + CHANNELS[c].id : CHANNELS[c].url });
+}
 var COLS = 5;
 
 var DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
