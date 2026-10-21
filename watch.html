@@ -26,7 +26,7 @@
 <video id="v" autoplay></video>
 <div id="msg">Yükleniyor...</div>
 <div id="ui">
-  <a id="home" class="ctl" href="index.html?home">&#9650; Ana Sayfa</a>
+  <a id="home" class="ctl" href="index.html">&#9650; Ana Sayfa</a>
   <a id="prev" class="ctl" href="#"><b>&#9664;</b><span id="prevName">&nbsp;</span></a>
   <a id="next" class="ctl" href="#"><b>&#9654;</b><span id="nextName">&nbsp;</span></a>
   <div id="name">&nbsp;</div>
@@ -63,11 +63,7 @@ if (pos < 0) {
   text(el('nextName'), after.name);
   el('prev').href = 'watch.html#' + before.id;
   el('next').href = 'watch.html#' + after.id;
-  v.onplaying = function () {
-    el('msg').style.display = 'none';
-    // Remembered for the dashboard's auto-resume; only channels that actually played count.
-    try { localStorage.setItem('dedetv_last', ch.id); } catch (e) {}
-  };
+  v.onplaying = function () { el('msg').style.display = 'none'; };
   v.onerror = fail;
   v.src = ch.stream;
   try { v.play(); } catch (e) {}
