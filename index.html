@@ -7,35 +7,29 @@
 <style>
   /* Written for very old TV browsers: no flexbox, no CSS variables, no modern JS. */
   html, body { margin: 0; padding: 0; height: 100%; background: #0b0d12; color: #f2f2f2; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
-  #wrap { padding: 3% 4% 0 4%; }
-  #top { height: 130px; }
-  #greet { font-size: 30px; color: #b8c0cc; }
-  #clock { font-size: 84px; font-weight: bold; line-height: 1.05; }
-  #date { font-size: 30px; color: #b8c0cc; }
-  #grid { margin-top: 40px; }
+  #wrap { padding: 24px 3% 0 3%; }
+  /* Clock on one line so the tiles get most of the screen: the remote only drives a pointer, so targets must be huge. */
+  #top { height: 84px; line-height: 84px; white-space: nowrap; }
+  #clock { display: inline-block; font-size: 72px; font-weight: bold; margin-right: 28px; }
+  #greet, #date { display: inline-block; font-size: 32px; color: #b8c0cc; margin-right: 22px; }
+  #grid { margin-top: 26px; }
   .tile {
     display: inline-block; vertical-align: top; position: relative;
     -webkit-box-sizing: border-box; -moz-box-sizing: border-box; box-sizing: border-box;
-    width: 18.4%; height: 150px; margin: 0 1.5% 28px 0;
-    border-radius: 14px; text-decoration: none; color: #fff;
-    border: 5px solid transparent; overflow: hidden;
+    width: 18.8%; height: 270px; margin: 0 1.5% 22px 0;
+    border-radius: 18px; text-decoration: none; color: #fff;
+    border: 8px solid transparent; overflow: hidden;
   }
-  .tile span { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 14px 0; text-align: center; font-size: 34px; font-weight: bold; }
-  /* The TV browser can drive the page with an on-screen pointer instead of arrow keys, so hover and focus highlight too. */
+  .tile span { position: absolute; left: 0; right: 0; top: 50%; margin-top: -24px; text-align: center; font-size: 42px; line-height: 48px; font-weight: bold; }
+  /* The TV browser drives the page with an on-screen pointer, so hover and focus highlight too. */
   .tile.on, .tile:hover, .tile:focus { border-color: #ffffff; outline: none; }
-  #hint { position: absolute; left: 4%; bottom: 3%; font-size: 24px; color: #8a93a0; }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <div id="top">
-    <div id="greet">&nbsp;</div>
-    <div id="clock">&nbsp;</div>
-    <div id="date">&nbsp;</div>
-  </div>
+  <div id="top"><div id="clock">&nbsp;</div><div id="greet">&nbsp;</div><div id="date">&nbsp;</div></div>
   <div id="grid"></div>
 </div>
-<div id="hint">Oku kutunun üstüne getirin ve OK'a basın. Geri dönmek için Back / Geri tuşu.</div>
 
 <script src="channels.js"></script>
 <script>

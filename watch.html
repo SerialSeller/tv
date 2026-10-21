@@ -8,19 +8,27 @@
   /* Written for very old TV browsers: no flexbox, no CSS variables, no modern JS. */
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
   video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: #000; }
-  #bar { position: absolute; left: 0; right: 0; top: 0; height: 110px; background: rgba(0, 0, 0, 0.65); }
-  #bar.hide { display: none; }
-  #home { position: absolute; left: 30px; top: 20px; display: block; padding: 18px 34px; border-radius: 12px; background: #2a2f3a; color: #fff; font-size: 32px; font-weight: bold; text-decoration: none; border: 4px solid transparent; }
-  #home:hover, #home:focus { border-color: #fff; }
-  #name { position: absolute; right: 40px; top: 28px; font-size: 44px; font-weight: bold; }
   #msg { position: absolute; left: 0; right: 0; top: 45%; text-align: center; font-size: 40px; color: #ddd; }
+  /* The remote only drives a pointer, so every control is a huge target: the whole left and right
+     edges switch channel, and the home button spans the top. They hide while watching. */
+  .ctl { position: absolute; display: block; color: #fff; text-decoration: none; font-weight: bold; background: rgba(0, 0, 0, 0.55); border: 6px solid transparent; -webkit-box-sizing: border-box; box-sizing: border-box; }
+  .ctl:hover, .ctl:focus { border-color: #fff; background: rgba(40, 46, 58, 0.85); outline: none; }
+  #home { left: 22%; right: 22%; top: 0; height: 120px; line-height: 108px; text-align: center; font-size: 40px; border-radius: 0 0 22px 22px; }
+  #prev, #next { top: 22%; bottom: 22%; width: 16%; text-align: center; font-size: 34px; }
+  #prev { left: 0; border-radius: 0 22px 22px 0; }
+  #next { right: 0; border-radius: 22px 0 0 22px; }
+  .ctl b { display: block; font-size: 72px; margin-top: 60px; }
+  #name { position: absolute; left: 0; right: 0; bottom: 40px; text-align: center; font-size: 52px; font-weight: bold; text-shadow: 0 2px 8px #000; }
+  .hide { display: none !important; }
 </style>
 </head>
 <body>
 <video id="v" autoplay></video>
 <div id="msg">Yükleniyor...</div>
-<div id="bar">
-  <a id="home" href="index.html">&#9664; Ana Sayfa</a>
+<div id="ui">
+  <a id="home" class="ctl" href="index.html">&#9650; Ana Sayfa</a>
+  <a id="prev" class="ctl" href="#"><b>&#9664;</b><span id="prevName">&nbsp;</span></a>
+  <a id="next" class="ctl" href="#"><b>&#9654;</b><span id="nextName">&nbsp;</span></a>
   <div id="name">&nbsp;</div>
 </div>
 
@@ -32,37 +40,48 @@ function text(node, s) { node.innerHTML = ''; node.appendChild(document.createTe
 // Switching channel only changes the #hash, which doesn't reload the page on its own.
 window.onhashchange = function () { location.reload(); };
 
+// Only channels with a stream take part in next/previous; YouTube stays on the home screen.
+var list = [];
+for (var i = 0; i < CHANNELS.length; i++) { if (CHANNELS[i].stream) { list.push(CHANNELS[i]); } }
+
 var id = (location.hash || '').replace('#', '');
-var ch = null;
-for (var i = 0; i < CHANNELS.length; i++) { if (CHANNELS[i].id === id && CHANNELS[i].stream) { ch = CHANNELS[i]; } }
+var pos = -1;
+for (var j = 0; j < list.length; j++) { if (list[j].id === id) { pos = j; } }
 
 var v = el('v');
-if (!ch) {
+function fail() { el('msg').style.display = 'block'; text(el('msg'), 'Bu kanal şu an açılmıyor. Yan oklarla başka kanala geçin.'); showUi(); }
+
+if (pos < 0) {
   text(el('msg'), 'Kanal bulunamadı');
 } else {
-  text(el('name'), ch.name);
+  var ch = list[pos];
+  var before = list[(pos - 1 + list.length) % list.length];
+  var after = list[(pos + 1) % list.length];
   document.title = ch.name;
+  text(el('name'), ch.name);
+  text(el('prevName'), before.name);
+  text(el('nextName'), after.name);
+  el('prev').href = 'watch.html#' + before.id;
+  el('next').href = 'watch.html#' + after.id;
   v.onplaying = function () { el('msg').style.display = 'none'; };
-  v.onerror = function () { el('msg').style.display = 'block'; text(el('msg'), 'Bu kanal şu an açılmıyor. Ana Sayfa\'ya dönün.'); showBar(); };
+  v.onerror = fail;
   v.src = ch.stream;
   try { v.play(); } catch (e) {}
   // Some streams neither play nor report an error; tell the viewer instead of showing "loading" forever.
-  setTimeout(function () {
-    if (v.currentTime < 0.5) { el('msg').style.display = 'block'; text(el('msg'), 'Bu kanal şu an açılmıyor. Ana Sayfa\'ya dönün.'); showBar(); }
-  }, 25000);
+  setTimeout(function () { if (v.currentTime < 0.5) { fail(); } }, 25000);
 }
 
-// Hide the top bar while watching; moving the remote's pointer brings it back.
+// Hide the controls while watching; moving the remote's pointer brings them back.
 var hideTimer = null;
-function showBar() {
-  el('bar').className = '';
+function showUi() {
+  el('ui').className = '';
   if (hideTimer) { clearTimeout(hideTimer); }
-  hideTimer = setTimeout(function () { if (!v.paused && !v.error) { el('bar').className = 'hide'; } }, 5000);
+  hideTimer = setTimeout(function () { if (!v.paused && !v.error && v.currentTime > 0.5) { el('ui').className = 'hide'; } }, 6000);
 }
-document.onmousemove = showBar;
-document.onclick = showBar;
-document.onkeydown = showBar;
-showBar();
+document.onmousemove = showUi;
+document.onclick = showUi;
+document.onkeydown = showUi;
+showUi();
 </script>
 </body>
 </html>
