@@ -24,12 +24,23 @@
   .tile span { position: absolute; left: 0; right: 0; top: 50%; margin-top: -24px; text-align: center; font-size: 42px; line-height: 48px; font-weight: bold; }
   /* The TV browser drives the page with an on-screen pointer, so hover and focus highlight too. */
   .tile.on, .tile:hover, .tile:focus { border-color: #ffffff; outline: none; }
+  /* Auto-resume prompt: centred, where the pointer usually rests, with two huge buttons. */
+  #resume { position: absolute; left: 50%; top: 50%; width: 760px; margin: -170px 0 0 -380px; padding: 30px 0 34px 0; background: #1c2230; border: 4px solid #ffffff; border-radius: 24px; text-align: center; }
+  #resumeText { font-size: 40px; margin-bottom: 28px; }
+  #resume a { display: inline-block; width: 300px; margin: 0 16px; padding: 26px 0; border-radius: 16px; font-size: 38px; font-weight: bold; color: #fff; text-decoration: none; border: 6px solid transparent; }
+  #resume a:hover, #resume a:focus { border-color: #fff; outline: none; }
+  #resumeGo { background: #2e7d32; }
+  #resumeStop { background: #5a6170; }
 </style>
 </head>
 <body>
 <div id="wrap">
   <div id="top"><div id="clock">&nbsp;</div><div id="greet">&nbsp;</div><div id="date">&nbsp;</div><div id="weather"></div></div>
   <div id="grid"></div>
+</div>
+<div id="resume" style="display: none;">
+  <div id="resumeText">&nbsp;</div>
+  <a id="resumeGo" href="#">Şimdi aç</a><a id="resumeStop" href="#">İptal</a>
 </div>
 
 <script src="channels.js"></script>
@@ -39,7 +50,9 @@ var TILES = [];
 for (var c = 0; c < CHANNELS.length; c++) {
   TILES.push({ name: CHANNELS[c].name, color: CHANNELS[c].color, url: CHANNELS[c].stream ? 'watch.html#' + CHANNELS[c].id : CHANNELS[c].url });
 }
-var COLS = 4;
+// Four big columns while the channels fit in two rows of four, five otherwise.
+var COLS = TILES.length <= 8 ? 4 : 5;
+var TILE_WIDTH = COLS === 4 ? '23.8%' : '18.8%';
 
 var DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 var MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
@@ -101,6 +114,7 @@ function build() {
     a.className = 'tile';
     a.href = TILES[i].url;
     a.style.backgroundColor = TILES[i].color;
+    a.style.width = TILE_WIDTH;
     if ((i + 1) % COLS === 0) { a.style.marginRight = '0'; }
     var s = document.createElement('span');
     s.appendChild(document.createTextNode(TILES[i].name));
@@ -148,6 +162,32 @@ tick();
 setInterval(tick, 10000);
 loadWeather();
 setInterval(loadWeather, 10 * 60 * 1000);
+
+// Auto-resume: when the dashboard opens fresh (TV just switched on), start the last watched channel
+// after a countdown. The player's Ana Sayfa button adds ?home so going back to the menu stays there.
+function startResume() {
+  if (/[?&]home/.test(location.search)) { return; }
+  var last = null;
+  try { last = localStorage.getItem('dedetv_last'); } catch (e) {}
+  var ch = null;
+  for (var i = 0; i < CHANNELS.length; i++) { if (CHANNELS[i].id === last) { ch = CHANNELS[i]; } }
+  if (!ch) { return; }
+  var left = 8;
+  var target = 'watch.html#' + ch.id;
+  var timer = null;
+  function show() { setText(el('resumeText'), ch.name + ' açılıyor... ' + left); }
+  function stop() { clearInterval(timer); el('resume').style.display = 'none'; return false; }
+  el('resumeGo').href = target;
+  el('resumeStop').onclick = stop;
+  el('resume').style.display = 'block';
+  show();
+  timer = setInterval(function () {
+    left -= 1;
+    if (left <= 0) { clearInterval(timer); window.location.href = target; return; }
+    show();
+  }, 1000);
+}
+startResume();
 </script>
 </body>
 </html>

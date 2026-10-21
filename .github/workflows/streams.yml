@@ -1,0 +1,32 @@
+# Checks every channel's stream each hour and swaps in a working link when one breaks or its token
+# (NOW's) is about to expire. See tools/update_streams.py.
+name: Repair streams
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repo-writes
+  cancel-in-progress: false
+
+jobs:
+  streams:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check and repair stream links
+        run: python3 tools/update_streams.py
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add streams.json channels.js
+          git diff --cached --quiet && exit 0
+          git commit -m "Repair stream links"
+          git pull --rebase
+          git push

@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: repo-writes
+  cancel-in-progress: false
+
 jobs:
   weather:
     runs-on: ubuntu-latest
@@ -25,4 +29,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add weather.json
-          git diff --cached --quiet || (git commit -m "Update weather" && git push)
+          git diff --cached --quiet && exit 0
+          git commit -m "Update weather"
+          git pull --rebase
+          git push
