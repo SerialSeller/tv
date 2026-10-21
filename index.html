@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dede TV</title>
+<style>
+  /* Written for very old TV browsers: no flexbox, no CSS variables, no modern JS. */
+  html, body { margin: 0; padding: 0; height: 100%; background: #0b0d12; color: #f2f2f2; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
+  #wrap { padding: 3% 4% 0 4%; }
+  #top { height: 130px; }
+  #greet { font-size: 30px; color: #b8c0cc; }
+  #clock { font-size: 84px; font-weight: bold; line-height: 1.05; }
+  #date { font-size: 30px; color: #b8c0cc; }
+  #grid { margin-top: 40px; }
+  .tile {
+    display: inline-block; vertical-align: top; position: relative;
+    -webkit-box-sizing: border-box; -moz-box-sizing: border-box; box-sizing: border-box;
+    width: 18.4%; height: 150px; margin: 0 1.5% 28px 0;
+    border-radius: 14px; text-decoration: none; color: #fff;
+    border: 5px solid transparent; overflow: hidden;
+  }
+  .tile span { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 14px 0; text-align: center; font-size: 34px; font-weight: bold; }
+  .tile.on { border-color: #ffffff; }
+  #hint { position: absolute; left: 4%; bottom: 3%; font-size: 24px; color: #8a93a0; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="top">
+    <div id="greet">&nbsp;</div>
+    <div id="clock">&nbsp;</div>
+    <div id="date">&nbsp;</div>
+  </div>
+  <div id="grid"></div>
+</div>
+<div id="hint">Yön tuşlarıyla seçin, OK ile açın. Geri dönmek için Back / Geri tuşu.</div>
+
+<script>
+// Each tile opens the channel's own live page in this browser.
+var TILES = [
+  { name: 'YouTube',  color: '#e62117', url: 'https://www.youtube.com/tv' },
+  { name: 'TRT 1',    color: '#1d4fa3', url: 'https://www.tabii.com/tr/watch/live/trt1' },
+  { name: 'ATV',      color: '#c8102e', url: 'https://www.atv.com.tr/canli-yayin' },
+  { name: 'Show TV',  color: '#e85d04', url: 'https://www.showtv.com.tr/canli-yayin' },
+  { name: 'Kanal D',  color: '#0a6ebd', url: 'https://www.kanald.com.tr/canli-yayin' },
+  { name: 'Star TV',  color: '#6a1b9a', url: 'https://www.startv.com.tr/canli-yayin' },
+  { name: 'NOW',      color: '#d4145a', url: 'https://www.nowtv.com.tr/canli-yayin' },
+  { name: 'TV8',      color: '#2e7d32', url: 'https://www.tv8.com.tr/canli-yayin' },
+  { name: 'NTV',      color: '#37474f', url: 'https://www.ntv.com.tr/canli-yayin/ntv' },
+  { name: 'TRT Haber',color: '#00838f', url: 'https://www.trthaber.com/canli-yayin-izle.html' }
+];
+var COLS = 5;
+
+var DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+var MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+
+function el(id) { return document.getElementById(id); }
+function pad(n) { return n < 10 ? '0' + n : String(n); }
+function setText(node, text) { node.innerHTML = ''; node.appendChild(document.createTextNode(text)); }
+
+function tick() {
+  var d = new Date();
+  var h = d.getHours();
+  var greet = h < 12 ? 'Günaydın' : (h < 18 ? 'İyi günler' : 'İyi akşamlar');
+  setText(el('greet'), greet);
+  setText(el('clock'), pad(h) + ':' + pad(d.getMinutes()));
+  setText(el('date'), d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() + ', ' + DAYS[d.getDay()]);
+}
+
+var tiles = [];
+var current = 0;
+
+function build() {
+  var grid = el('grid');
+  for (var i = 0; i < TILES.length; i++) {
+    var a = document.createElement('a');
+    a.className = 'tile';
+    a.href = TILES[i].url;
+    a.style.backgroundColor = TILES[i].color;
+    if ((i + 1) % COLS === 0) { a.style.marginRight = '0'; }
+    var s = document.createElement('span');
+    s.appendChild(document.createTextNode(TILES[i].name));
+    a.appendChild(s);
+    grid.appendChild(a);
+    tiles.push(a);
+  }
+}
+
+function focusTile(i) {
+  if (i < 0 || i >= tiles.length) { return; }
+  tiles[current].className = 'tile';
+  current = i;
+  tiles[current].className = 'tile on';
+  try { localStorage.setItem('dedetv_focus', String(current)); } catch (e) {}
+}
+
+function open() {
+  window.location.href = TILES[current].url;
+}
+
+document.onkeydown = function (e) {
+  e = e || window.event;
+  var k = e.keyCode || e.which;
+  var handled = true;
+  if (k === 37) { if (current % COLS > 0) { focusTile(current - 1); } }
+  else if (k === 39) { if (current % COLS < COLS - 1) { focusTile(current + 1); } }
+  else if (k === 38) { focusTile(current - COLS); }
+  else if (k === 40) { focusTile(current + COLS); }
+  else if (k === 13) { open(); }
+  else { handled = false; }
+  if (handled) {
+    if (e.preventDefault) { e.preventDefault(); }
+    return false;
+  }
+};
+
+build();
+var saved = 0;
+try { saved = parseInt(localStorage.getItem('dedetv_focus'), 10) || 0; } catch (e) {}
+focusTile(saved < tiles.length ? saved : 0);
+tick();
+setInterval(tick, 10000);
+</script>
+</body>
+</html>
