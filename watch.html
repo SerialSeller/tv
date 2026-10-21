@@ -12,7 +12,7 @@
   /* The remote only drives a pointer, so every control is a huge target: the whole left and right
      edges switch channel, and the home button spans the top. They hide while watching. */
   .ctl { position: absolute; display: block; color: #fff; text-decoration: none; font-weight: bold; background: rgba(0, 0, 0, 0.55); border: 6px solid transparent; -webkit-box-sizing: border-box; box-sizing: border-box; }
-  .ctl:hover, .ctl:focus { border-color: #fff; background: rgba(40, 46, 58, 0.85); outline: none; }
+  .ctl:hover, .ctl:focus { border-color: #ffd400; background: rgba(40, 46, 58, 0.85); outline: none; }
   #home { left: 22%; right: 22%; top: 0; height: 120px; line-height: 108px; text-align: center; font-size: 40px; border-radius: 0 0 22px 22px; }
   #prev, #next { top: 22%; bottom: 22%; width: 16%; text-align: center; font-size: 34px; }
   #prev { left: 0; border-radius: 0 22px 22px 0; }
@@ -87,5 +87,6 @@ document.onclick = showUi;
 document.onkeydown = showUi;
 showUi();
 </script>
+<script src="pointer.js"></script>
 </body>
 </html>
