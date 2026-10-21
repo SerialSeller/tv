@@ -40,7 +40,7 @@ function text(node, s) { node.innerHTML = ''; node.appendChild(document.createTe
 // Switching channel only changes the #hash, which doesn't reload the page on its own.
 window.onhashchange = function () { location.reload(); };
 
-// Only channels with a stream take part in next/previous; YouTube stays on the home screen.
+// Only channels with a stream take part in next/previous.
 var list = [];
 for (var i = 0; i < CHANNELS.length; i++) { if (CHANNELS[i].stream) { list.push(CHANNELS[i]); } }
 

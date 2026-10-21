@@ -16,7 +16,7 @@
   .tile {
     display: inline-block; vertical-align: top; position: relative;
     -webkit-box-sizing: border-box; -moz-box-sizing: border-box; box-sizing: border-box;
-    width: 18.8%; height: 270px; margin: 0 1.5% 22px 0;
+    width: 23.8%; height: 270px; margin: 0 1.5% 22px 0;
     border-radius: 18px; text-decoration: none; color: #fff;
     border: 8px solid transparent; overflow: hidden;
   }
@@ -33,12 +33,12 @@
 
 <script src="channels.js"></script>
 <script>
-// Channels open in our own light player; YouTube opens its TV site.
+// Channels open in our own light player; a tile with a plain url opens that site instead.
 var TILES = [];
 for (var c = 0; c < CHANNELS.length; c++) {
   TILES.push({ name: CHANNELS[c].name, color: CHANNELS[c].color, url: CHANNELS[c].stream ? 'watch.html#' + CHANNELS[c].id : CHANNELS[c].url });
 }
-var COLS = 5;
+var COLS = 4;
 
 var DAYS = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 var MONTHS = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
