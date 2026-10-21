@@ -35,7 +35,7 @@
   </div>
   <div id="grid"></div>
 </div>
-<div id="hint">Yön tuşlarıyla seçin, OK ile açın. Geri dönmek için Back / Geri tuşu.</div>
+<div id="hint">Oku kutunun üstüne getirin ve OK'a basın. Geri dönmek için Back / Geri tuşu.</div>
 
 <script>
 // Each tile opens the channel's own live page in this browser.
@@ -118,9 +118,11 @@ document.onkeydown = function (e) {
 };
 
 build();
+// The Vestel browser drives pages with an on-screen pointer and never sends arrow keys, so no tile
+// starts highlighted there; the key handling above only matters on browsers that do send keys.
 var saved = 0;
 try { saved = parseInt(localStorage.getItem('dedetv_focus'), 10) || 0; } catch (e) {}
-focusTile(saved < tiles.length ? saved : 0);
+current = saved < tiles.length ? saved : 0;
 tick();
 setInterval(tick, 10000);
 </script>
