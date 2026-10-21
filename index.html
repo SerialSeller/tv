@@ -12,6 +12,7 @@
   #top { height: 84px; line-height: 84px; white-space: nowrap; }
   #clock { display: inline-block; font-size: 72px; font-weight: bold; margin-right: 28px; }
   #greet, #date { display: inline-block; font-size: 32px; color: #b8c0cc; margin-right: 22px; }
+  #weather { display: inline-block; font-size: 40px; font-weight: bold; color: #ffd27a; }
   #grid { margin-top: 26px; }
   .tile {
     display: inline-block; vertical-align: top; position: relative;
@@ -27,7 +28,7 @@
 </head>
 <body>
 <div id="wrap">
-  <div id="top"><div id="clock">&nbsp;</div><div id="greet">&nbsp;</div><div id="date">&nbsp;</div></div>
+  <div id="top"><div id="clock">&nbsp;</div><div id="greet">&nbsp;</div><div id="date">&nbsp;</div><div id="weather"></div></div>
   <div id="grid"></div>
 </div>
 
@@ -54,6 +55,40 @@ function tick() {
   setText(el('greet'), greet);
   setText(el('clock'), pad(h) + ':' + pad(d.getMinutes()));
   setText(el('date'), d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() + ', ' + DAYS[d.getDay()]);
+}
+
+// Outside temperature in Güngören. A GitHub Action refreshes weather.json every 30 minutes, because the
+// TV rejects the weather service's own certificate but trusts github.io.
+function weatherLabel(code) {
+  if (code === 0) { return 'Açık'; }
+  if (code <= 2) { return 'Az bulutlu'; }
+  if (code === 3) { return 'Kapalı'; }
+  if (code === 45 || code === 48) { return 'Sisli'; }
+  if (code >= 51 && code <= 57) { return 'Çisenti'; }
+  if (code >= 61 && code <= 67) { return 'Yağmurlu'; }
+  if (code >= 71 && code <= 77) { return 'Karlı'; }
+  if (code >= 80 && code <= 82) { return 'Sağanak'; }
+  if (code === 85 || code === 86) { return 'Kar yağışlı'; }
+  if (code >= 95) { return 'Gök gürültülü'; }
+  return '';
+}
+
+function loadWeather() {
+  var x = new XMLHttpRequest();
+  x.onreadystatechange = function () {
+    if (x.readyState !== 4 || x.status !== 200) { return; }
+    try {
+      var w = JSON.parse(x.responseText);
+      // "2026-10-21T20:15" is İstanbul time; parse by hand since old browsers disagree on ISO strings without a zone.
+      var p = w.time.split(/[-T:]/);
+      var age = new Date().getTime() - new Date(+p[0], +p[1] - 1, +p[2], +p[3], +p[4]).getTime();
+      if (age > 3 * 3600 * 1000) { setText(el('weather'), ''); return; }
+      var label = weatherLabel(w.code);
+      setText(el('weather'), Math.round(w.temp) + '°C' + (label ? '  ' + label : ''));
+    } catch (e) {}
+  };
+  x.open('GET', 'weather.json?t=' + new Date().getTime(), true);
+  x.send();
 }
 
 var tiles = [];
@@ -111,6 +146,8 @@ try { saved = parseInt(localStorage.getItem('dedetv_focus'), 10) || 0; } catch (
 current = saved < tiles.length ? saved : 0;
 tick();
 setInterval(tick, 10000);
+loadWeather();
+setInterval(loadWeather, 10 * 60 * 1000);
 </script>
 </body>
 </html>

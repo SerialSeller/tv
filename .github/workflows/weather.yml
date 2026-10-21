@@ -1,0 +1,28 @@
+# The TV's browser rejects the Let's Encrypt certificate that Open-Meteo uses, so GitHub fetches the
+# weather on a schedule and commits it here; the dashboard then reads weather.json from github.io.
+name: Update weather
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  weather:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch current weather for Güngören, İstanbul
+        run: |
+          curl -sf --retry 3 "https://api.open-meteo.com/v1/forecast?latitude=41.02&longitude=28.87&current=temperature_2m,weather_code,is_day&timezone=Europe%2FIstanbul" \
+            | jq '{temp: .current.temperature_2m, code: .current.weather_code, day: .current.is_day, time: .current.time}' > weather.json
+          cat weather.json
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add weather.json
+          git diff --cached --quiet || (git commit -m "Update weather" && git push)
