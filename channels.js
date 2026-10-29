@@ -29,7 +29,7 @@ var CHANNELS = [
     "id": "now",
     "name": "NOW",
     "color": "#d4145a",
-    "stream": "https://nowtv.daioncdn.net/nowtv/nowtv.m3u8?ce=3&app=65fa8997-2b2f-4529-85ea-84318628a608&st=EqkVaRQ-mQt3gSxAil1rmw&e=1793277170"
+    "stream": "https://nowtv.daioncdn.net/nowtv/nowtv.m3u8?ce=3&app=65fa8997-2b2f-4529-85ea-84318628a608&st=_q3hJ9w415JV5J3mCXvY-A&e=1793304568"
   },
   {
     "id": "startv",
