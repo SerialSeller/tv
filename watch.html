@@ -60,6 +60,8 @@ var LATER_ROUND_WAIT = 35;  // ...so the second time round each link gets longer
 var STALL_WAIT = 15;        // seconds of frozen picture before giving up on a link that was playing.
 var ROUND_PAUSE = 10;       // seconds between rounds, so a dead connection isn't hammered.
 var RELOAD_PAUSE = 30;      // seconds before reloading to fetch freshly repaired links.
+var UPGRADE_WAIT = 600;     // seconds on a backup before trying the best link again; doubles when that fails...
+var UPGRADE_MAX = 3600;     // ...up to this, so a long outage doesn't keep interrupting the picture.
 
 var ch = null;
 var index = 0;
@@ -68,6 +70,11 @@ var started = false;
 var busy = true;
 var lastTime = 0;
 var lastProgress = 0;
+var linkStart = 0;
+var stallRetried = false;
+var upgrading = false;
+var upgradeWait = UPGRADE_WAIT;
+var upgradeAt = 0;
 
 function now() { return new Date().getTime() / 1000; }
 
@@ -83,6 +90,7 @@ function playLink(i) {
   setTimeout(function () {
     lastTime = 0;
     lastProgress = now();
+    linkStart = now();
     busy = false;
     v.src = ch.streams[i];
     try { v.load(); v.play(); } catch (e) {}
@@ -91,6 +99,11 @@ function playLink(i) {
 
 function nextLink() {
   if (busy) { return; }
+  if (upgrading) {
+    upgrading = false;
+    upgradeWait = Math.min(upgradeWait * 2, UPGRADE_MAX);
+  }
+  upgradeAt = now() + upgradeWait;
   if (index + 1 < ch.streams.length) {
     showMsg('Bağlanıyor, lütfen bekleyin...');
     playLink(index + 1);
@@ -117,6 +130,17 @@ function watchdog() {
     started = true;
     round = 0;
     el('msg').style.display = 'none';
+    // A link that has held up for a minute has earned another same-link retry, and ends an upgrade attempt.
+    if (now() - linkStart > 60) { stallRetried = false; }
+    if (index === 0 && upgrading) { upgrading = false; upgradeWait = UPGRADE_WAIT; }
+    // On a backup: climb back to the best link once it has had time to recover.
+    if (index > 0 && now() >= upgradeAt) { upgrading = true; playLink(0); }
+    return;
+  }
+  // A short hiccup shouldn't cost quality: reconnect to the same link once before moving down the list.
+  if (started && !stallRetried && now() - lastProgress > STALL_WAIT) {
+    stallRetried = true;
+    playLink(index);
     return;
   }
   var limit = started ? STALL_WAIT : (round === 0 ? FIRST_ROUND_WAIT : LATER_ROUND_WAIT);

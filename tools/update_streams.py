@@ -40,7 +40,8 @@ DAION_NTV = "https://dogus.daioncdn.net/ntv/ntv%s.m3u8?app=ntv_web"
 ERCDN_ATV = "https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/atv/atv_%s.m3u8"
 TRT = "https://tv-%s.medya.trt.com.tr/master_%s.m3u8"
 
-# links: tried in this order, best quality first; the player falls back down the list.
+# links: tried in this order, best quality first: fixed 1080p, then the broadcaster's adaptive playlist, then 720p.
+# The player falls back down the list and climbs back up. Star TV's top rendition is 720p.
 # page/page_host: where to look for fresh links. iptv: the channel's tvg-id prefix in the iptv-org list.
 # token_first: a page link with a token goes ahead of the fixed links.
 CHANNELS = [
@@ -50,11 +51,11 @@ CHANNELS = [
      "links": [ERCDN_ATV % "1080p", ERCDN_ATV % "720p"]},
     {"id": "showtv", "name": "Show TV", "color": "#e85d04", "iptv": "ShowTV.tr",
      "page": "https://www.showtv.com.tr/canli-yayin", "page_host": "ciner.daioncdn.net",
-     "links": [DAION_SHOW % "", DAION_SHOW % "_720p"]},
+     "links": [DAION_SHOW % "_1080p", DAION_SHOW % "", DAION_SHOW % "_720p"]},
     {"id": "kanald", "name": "Kanal D", "color": "#0a6ebd", "iptv": "KanalD.tr",
      "page": "https://www.kanald.com.tr/canli-yayin", "page_host": "demiroren.daioncdn.net",
      # duhnet is a separate CDN from the other two, so it survives a daioncdn outage.
-     "links": [DAION_KANALD % "", DAION_KANALD % "_720p", "https://kdlive.duhnet.tv/S2/HLS_LIVE/kanalddainp/playlist.m3u8"]},
+     "links": [DAION_KANALD % "_1080p", DAION_KANALD % "", DAION_KANALD % "_720p", "https://kdlive.duhnet.tv/S2/HLS_LIVE/kanalddainp/playlist.m3u8"]},
     {"id": "now", "name": "NOW", "color": "#d4145a", "iptv": "NOW.tr", "token_first": True,
      "page": "https://www.nowtv.com.tr/canli-yayin", "page_host": "nowtv.daioncdn.net",
      "links": ["https://uycyyuuzyh.turknet.ercdn.net/nphindgytw/nowtv/nowtv_720p.m3u8"]},
@@ -63,10 +64,10 @@ CHANNELS = [
      "links": [DAION_STAR % "", DAION_STAR % "_720p"]},
     {"id": "tv8", "name": "TV8", "color": "#2e7d32", "iptv": "TV8.tr",
      "page": "https://www.tv8.com.tr/canli-yayin", "page_host": "tv8.daioncdn.net",
-     "links": [DAION_TV8 % "", DAION_TV8 % "_720p"]},
+     "links": [DAION_TV8 % "_1080p", DAION_TV8 % "", DAION_TV8 % "_720p"]},
     {"id": "ntv", "name": "NTV", "color": "#37474f", "iptv": "NTV.tr",
      "page": "https://www.ntv.com.tr/canli-yayin/ntv", "page_host": "dogus.daioncdn.net",
-     "links": [DAION_NTV % "", DAION_NTV % "_720p"]},
+     "links": [DAION_NTV % "_1080p", DAION_NTV % "", DAION_NTV % "_720p"]},
     {"id": "trthaber", "name": "TRT Haber", "color": "#00838f", "iptv": "TRTHaber.tr",
      "links": [TRT % ("trthaber", "1080"), TRT % ("trthaber", "720"), TRT % ("trthaber", "480")]},
 ]

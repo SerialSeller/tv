@@ -24,6 +24,7 @@ var CHANNELS = [
     "name": "Show TV",
     "color": "#e85d04",
     "streams": [
+      "https://ciner.daioncdn.net/showtv/showtv_1080p.m3u8?ce=3&app=4bc856ef-4c68-4a94-bc87-37dfaaa66558",
       "https://ciner.daioncdn.net/showtv/showtv.m3u8?ce=3&app=4bc856ef-4c68-4a94-bc87-37dfaaa66558",
       "https://ciner.daioncdn.net/showtv/showtv_720p.m3u8?ce=3&app=4bc856ef-4c68-4a94-bc87-37dfaaa66558"
     ]
@@ -33,6 +34,7 @@ var CHANNELS = [
     "name": "Kanal D",
     "color": "#0a6ebd",
     "streams": [
+      "https://demiroren.daioncdn.net/kanald/kanald_1080p.m3u8?app=kanald_web&ce=3",
       "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web&ce=3",
       "https://demiroren.daioncdn.net/kanald/kanald_720p.m3u8?app=kanald_web&ce=3",
       "https://kdlive.duhnet.tv/S2/HLS_LIVE/kanalddainp/playlist.m3u8"
@@ -61,6 +63,7 @@ var CHANNELS = [
     "name": "TV8",
     "color": "#2e7d32",
     "streams": [
+      "https://tv8.daioncdn.net/tv8/tv8_1080p.m3u8?app=7ddc255a-ef47-4e81-ab14-c0e5f2949788&ce=3",
       "https://tv8.daioncdn.net/tv8/tv8.m3u8?app=7ddc255a-ef47-4e81-ab14-c0e5f2949788&ce=3",
       "https://tv8.daioncdn.net/tv8/tv8_720p.m3u8?app=7ddc255a-ef47-4e81-ab14-c0e5f2949788&ce=3"
     ]
@@ -70,6 +73,7 @@ var CHANNELS = [
     "name": "NTV",
     "color": "#37474f",
     "streams": [
+      "https://dogus.daioncdn.net/ntv/ntv_1080p.m3u8?app=ntv_web",
       "https://dogus.daioncdn.net/ntv/ntv.m3u8?app=ntv_web",
       "https://dogus.daioncdn.net/ntv/ntv_720p.m3u8?app=ntv_web"
     ]
