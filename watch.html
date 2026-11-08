@@ -8,7 +8,7 @@
   /* Written for very old TV browsers: no flexbox, no CSS variables, no modern JS. */
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; color: #fff; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }
   video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: #000; }
-  #msg { position: absolute; left: 0; right: 0; top: 45%; text-align: center; font-size: 40px; color: #ddd; }
+  #msg { position: absolute; left: 18%; right: 18%; top: 40%; text-align: center; font-size: 40px; color: #ddd; }
   /* The remote only drives a pointer, so every control is a huge target: the whole left and right
      edges switch channel, and the home button spans the top. They hide while watching. */
   .ctl { position: absolute; display: block; color: #fff; text-decoration: none; font-weight: bold; background: rgba(0, 0, 0, 0.55); border: 6px solid transparent; -webkit-box-sizing: border-box; box-sizing: border-box; }
@@ -32,7 +32,10 @@
   <div id="name">&nbsp;</div>
 </div>
 
-<script src="channels.js"></script>
+<script>
+// A 10-minute stamp so a TV that caches aggressively still picks up repaired links.
+document.write('<script src="channels.js?t=' + Math.floor(new Date().getTime() / 600000) + '"><\/script>');
+</script>
 <script>
 function el(id) { return document.getElementById(id); }
 function text(node, s) { node.innerHTML = ''; node.appendChild(document.createTextNode(s)); }
@@ -40,35 +43,100 @@ function text(node, s) { node.innerHTML = ''; node.appendChild(document.createTe
 // Switching channel only changes the #hash, which doesn't reload the page on its own.
 window.onhashchange = function () { location.reload(); };
 
-// Only channels with a stream take part in next/previous.
-var list = [];
-for (var i = 0; i < CHANNELS.length; i++) { if (CHANNELS[i].stream) { list.push(CHANNELS[i]); } }
-
+var list = CHANNELS;
 var id = (location.hash || '').replace('#', '');
 var pos = -1;
 for (var j = 0; j < list.length; j++) { if (list[j].id === id) { pos = j; } }
 
 var v = el('v');
-function fail() { el('msg').style.display = 'block'; text(el('msg'), 'Bu kanal şu an açılmıyor. Yan oklarla başka kanala geçin.'); showUi(); }
+
+function showMsg(s) { el('msg').style.display = 'block'; text(el('msg'), s); }
+
+// Each channel has several links, best first. On an error or a freeze the player moves to the next one
+// by itself, and when all have failed it waits and starts over, so a channel comes back without anyone
+// touching the remote. Progress is judged by currentTime, the only playback signal this TV reports.
+var FIRST_ROUND_WAIT = 15;  // seconds a link gets to start; the slowest playlists can take over 20...
+var LATER_ROUND_WAIT = 35;  // ...so the second time round each link gets longer.
+var STALL_WAIT = 15;        // seconds of frozen picture before giving up on a link that was playing.
+var ROUND_PAUSE = 10;       // seconds between rounds, so a dead connection isn't hammered.
+var RELOAD_PAUSE = 30;      // seconds before reloading to fetch freshly repaired links.
+
+var ch = null;
+var index = 0;
+var round = 0;
+var started = false;
+var busy = true;
+var lastTime = 0;
+var lastProgress = 0;
+
+function now() { return new Date().getTime() / 1000; }
+
+function showName() { text(el('name'), ch.name + (index > 0 ? ' (yedek ' + index + ')' : '')); }
+
+function playLink(i) {
+  index = i;
+  started = false;
+  busy = true;
+  showName();
+  // Empty the player first: the TV has a single video decoder, which the old stream must release.
+  try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {}
+  setTimeout(function () {
+    lastTime = 0;
+    lastProgress = now();
+    busy = false;
+    v.src = ch.streams[i];
+    try { v.load(); v.play(); } catch (e) {}
+  }, 300);
+}
+
+function nextLink() {
+  if (busy) { return; }
+  if (index + 1 < ch.streams.length) {
+    showMsg('Bağlanıyor, lütfen bekleyin...');
+    playLink(index + 1);
+    return;
+  }
+  busy = true;
+  round += 1;
+  try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {}
+  showMsg('Bu kanal şu an açılmıyor. Tekrar deneniyor...');
+  showUi();
+  if (round >= 2) {
+    setTimeout(function () { location.reload(); }, RELOAD_PAUSE * 1000);
+  } else {
+    setTimeout(function () { playLink(0); }, ROUND_PAUSE * 1000);
+  }
+}
+
+function watchdog() {
+  if (busy) { return; }
+  var t = v.currentTime || 0;
+  if (Math.abs(t - lastTime) > 0.2) {
+    lastTime = t;
+    lastProgress = now();
+    started = true;
+    round = 0;
+    el('msg').style.display = 'none';
+    return;
+  }
+  var limit = started ? STALL_WAIT : (round === 0 ? FIRST_ROUND_WAIT : LATER_ROUND_WAIT);
+  if (now() - lastProgress > limit) { nextLink(); }
+}
 
 if (pos < 0) {
   text(el('msg'), 'Kanal bulunamadı');
 } else {
-  var ch = list[pos];
+  ch = list[pos];
   var before = list[(pos - 1 + list.length) % list.length];
   var after = list[(pos + 1) % list.length];
   document.title = ch.name;
-  text(el('name'), ch.name);
   text(el('prevName'), before.name);
   text(el('nextName'), after.name);
   el('prev').href = 'watch.html#' + before.id;
   el('next').href = 'watch.html#' + after.id;
-  v.onplaying = function () { el('msg').style.display = 'none'; };
-  v.onerror = fail;
-  v.src = ch.stream;
-  try { v.play(); } catch (e) {}
-  // Some streams neither play nor report an error; tell the viewer instead of showing "loading" forever.
-  setTimeout(function () { if (v.currentTime < 0.5) { fail(); } }, 25000);
+  v.onerror = nextLink;
+  playLink(0);
+  setInterval(watchdog, 2000);
 }
 
 // Hide the controls while watching; moving the remote's pointer brings them back.

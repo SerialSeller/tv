@@ -1,92 +1,84 @@
-"""Keep every channel's stream link working without anyone touching it.
+"""Keep every channel's list of stream links healthy without anyone touching it.
 
-Runs hourly from .github/workflows/streams.yml. GitHub's runners are outside Turkey, so a channel that is
-geo-blocked abroad (TRT 1 during some matches) looks broken from there; the last link is then kept. For each channel it tries, in order: the link in use
-now, links found on the channel's own live page, and links from the community iptv-org list. A link
-counts as working when its playlist and newest video segment download, and no host on the way uses a
-Let's Encrypt certificate (the TV's 2017 browser rejects those). Links carrying an expiry (`e=` epoch,
-NOW's tokens) are replaced before they run out. The result is written to streams.json and channels.js.
+Each channel has an ordered list of links. The TV's player (watch.html) starts with the first and moves
+to the next by itself when one errors or freezes, so this job does not need to pick "the" working link.
+It does three things, from .github/workflows/streams.yml:
+  1. Renews NOW's link, whose token lasts about 4 hours, from the channel's live page.
+  2. Adds fresh links from the channel's page and the iptv-org list when every known link is dead.
+  3. Reports which links work, in the job summary.
+
+GitHub's runners are outside Turkey and some channels block foreign visitors (TV8 usually, TRT 1 during
+some matches), so a failure here does not mean the link is dead for the TV. Known links are never removed.
+GitHub also runs "hourly" schedules only every 3 to 17 hours in practice, so NOW keeps a token-free backup.
 
 Usage: python3 tools/update_streams.py   (from the repo root)
 """
 import json
 import os
 import re
-import socket
-import ssl
 import sys
 import time
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 UA = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
 IPTV_ORG = "https://iptv-org.github.io/iptv/countries/tr.m3u"
-# Replace expiring links this long before they run out; the job runs hourly.
+# Renew expiring links this long before they run out.
 EXPIRY_MARGIN = 2 * 3600
+# Some playlists take over 20 seconds to answer, then work fine.
+TIMEOUT = 30
+MAX_LINKS = 6
 # Only the broadcasters' own CDNs: the iptv-org list also carries third-party restreams we don't want.
 OFFICIAL_HOSTS = (".trt.com.tr", ".daioncdn.net", ".ercdn.net", ".duhnet.tv")
 
-# preferred: the link to use while it works (1080p where the broadcaster offers a fixed one; otherwise
-# the full playlist so the TV can pick up to 1080p). page/page_host: where to look for a fresh link.
-# iptv: the channel's tvg-id prefix in the iptv-org list.
+DAION_SHOW = "https://ciner.daioncdn.net/showtv/showtv%s.m3u8?ce=3&app=4bc856ef-4c68-4a94-bc87-37dfaaa66558"
+DAION_KANALD = "https://demiroren.daioncdn.net/kanald/kanald%s.m3u8?app=kanald_web&ce=3"
+DAION_STAR = "https://dogus.daioncdn.net/startv/startv%s.m3u8?app=a20ac41e-bdc3-4aa1-934d-26b484480ac9&ce=3"
+DAION_TV8 = "https://tv8.daioncdn.net/tv8/tv8%s.m3u8?app=7ddc255a-ef47-4e81-ab14-c0e5f2949788&ce=3"
+DAION_NTV = "https://dogus.daioncdn.net/ntv/ntv%s.m3u8?app=ntv_web"
+ERCDN_ATV = "https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/atv/atv_%s.m3u8"
+TRT = "https://tv-%s.medya.trt.com.tr/master_%s.m3u8"
+
+# links: tried in this order, best quality first; the player falls back down the list.
+# page/page_host: where to look for fresh links. iptv: the channel's tvg-id prefix in the iptv-org list.
+# token_first: a page link with a token goes ahead of the fixed links.
 CHANNELS = [
-    {"id": "trt1", "name": "TRT 1", "color": "#1d4fa3",
-     "preferred": "https://tv-trt1.medya.trt.com.tr/master_1080.m3u8", "iptv": "TRT1.tr"},
-    {"id": "atv", "name": "ATV", "color": "#c8102e",
-     "preferred": "https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/atv/atv_1080p.m3u8",
-     "page": "https://www.atv.com.tr/canli-yayin", "iptv": "ATV.tr"},
-    {"id": "showtv", "name": "Show TV", "color": "#e85d04",
-     "preferred": "https://ciner.daioncdn.net/showtv/showtv.m3u8?ce=3&app=4bc856ef-4c68-4a94-bc87-37dfaaa66558",
-     "page": "https://www.showtv.com.tr/canli-yayin", "page_host": "ciner.daioncdn.net", "iptv": "ShowTV.tr"},
-    {"id": "kanald", "name": "Kanal D", "color": "#0a6ebd",
-     "preferred": "https://demiroren.daioncdn.net/kanald/kanald.m3u8?app=kanald_web&ce=3",
-     "page": "https://www.kanald.com.tr/canli-yayin", "page_host": "demiroren.daioncdn.net", "iptv": "KanalD.tr"},
-    {"id": "now", "name": "NOW", "color": "#d4145a",
-     "page": "https://www.nowtv.com.tr/canli-yayin", "page_host": "nowtv.daioncdn.net", "iptv": "NOW.tr"},
-    {"id": "startv", "name": "Star TV", "color": "#6a1b9a",
-     "preferred": "https://dogus.daioncdn.net/startv/startv.m3u8?app=a20ac41e-bdc3-4aa1-934d-26b484480ac9&ce=3",
-     "page": "https://www.startv.com.tr/canli-yayin", "page_host": "dogus.daioncdn.net", "iptv": "StarTV.tr"},
-    {"id": "tv8", "name": "TV8", "color": "#2e7d32",
-     "preferred": "https://tv8.daioncdn.net/tv8/tv8.m3u8?app=7ddc255a-ef47-4e81-ab14-c0e5f2949788&ce=3",
-     "page": "https://www.tv8.com.tr/canli-yayin", "page_host": "tv8.daioncdn.net", "iptv": "TV8.tr"},
-    {"id": "ntv", "name": "NTV", "color": "#37474f",
-     "preferred": "https://dogus.daioncdn.net/ntv/ntv.m3u8?app=ntv_web",
-     "page": "https://www.ntv.com.tr/canli-yayin/ntv", "page_host": "dogus.daioncdn.net", "iptv": "NTV.tr"},
-    {"id": "trthaber", "name": "TRT Haber", "color": "#00838f",
-     "preferred": "https://tv-trthaber.medya.trt.com.tr/master_1080.m3u8", "iptv": "TRTHaber.tr"},
+    {"id": "trt1", "name": "TRT 1", "color": "#1d4fa3", "iptv": "TRT1.tr",
+     "links": [TRT % ("trt1", "1080"), TRT % ("trt1", "720"), TRT % ("trt1", "480")]},
+    {"id": "atv", "name": "ATV", "color": "#c8102e", "iptv": "ATV.tr", "page": "https://www.atv.com.tr/canli-yayin",
+     "links": [ERCDN_ATV % "1080p", ERCDN_ATV % "720p"]},
+    {"id": "showtv", "name": "Show TV", "color": "#e85d04", "iptv": "ShowTV.tr",
+     "page": "https://www.showtv.com.tr/canli-yayin", "page_host": "ciner.daioncdn.net",
+     "links": [DAION_SHOW % "", DAION_SHOW % "_720p"]},
+    {"id": "kanald", "name": "Kanal D", "color": "#0a6ebd", "iptv": "KanalD.tr",
+     "page": "https://www.kanald.com.tr/canli-yayin", "page_host": "demiroren.daioncdn.net",
+     # duhnet is a separate CDN from the other two, so it survives a daioncdn outage.
+     "links": [DAION_KANALD % "", DAION_KANALD % "_720p", "https://kdlive.duhnet.tv/S2/HLS_LIVE/kanalddainp/playlist.m3u8"]},
+    {"id": "now", "name": "NOW", "color": "#d4145a", "iptv": "NOW.tr", "token_first": True,
+     "page": "https://www.nowtv.com.tr/canli-yayin", "page_host": "nowtv.daioncdn.net",
+     "links": ["https://uycyyuuzyh.turknet.ercdn.net/nphindgytw/nowtv/nowtv_720p.m3u8"]},
+    {"id": "startv", "name": "Star TV", "color": "#6a1b9a", "iptv": "StarTV.tr",
+     "page": "https://www.startv.com.tr/canli-yayin", "page_host": "dogus.daioncdn.net",
+     "links": [DAION_STAR % "", DAION_STAR % "_720p"]},
+    {"id": "tv8", "name": "TV8", "color": "#2e7d32", "iptv": "TV8.tr",
+     "page": "https://www.tv8.com.tr/canli-yayin", "page_host": "tv8.daioncdn.net",
+     "links": [DAION_TV8 % "", DAION_TV8 % "_720p"]},
+    {"id": "ntv", "name": "NTV", "color": "#37474f", "iptv": "NTV.tr",
+     "page": "https://www.ntv.com.tr/canli-yayin/ntv", "page_host": "dogus.daioncdn.net",
+     "links": [DAION_NTV % "", DAION_NTV % "_720p"]},
+    {"id": "trthaber", "name": "TRT Haber", "color": "#00838f", "iptv": "TRTHaber.tr",
+     "links": [TRT % ("trthaber", "1080"), TRT % ("trthaber", "720"), TRT % ("trthaber", "480")]},
 ]
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE = os.path.join(ROOT, "streams.json")
 OUTPUT = os.path.join(ROOT, "channels.js")
 
-_issuer_cache = {}
-
-
-def get(url, timeout=15):
+def get(url, timeout=TIMEOUT):
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.geturl(), r.read()
-
-
-def issuer_org(host):
-    """Organisation that issued the host's certificate, or None if unreachable."""
-    if host not in _issuer_cache:
-        try:
-            ctx = ssl.create_default_context()
-            with socket.create_connection((host, 443), timeout=10) as sock:
-                with ctx.wrap_socket(sock, server_hostname=host) as tls:
-                    issuer = dict(x[0] for x in tls.getpeercert()["issuer"])
-            _issuer_cache[host] = issuer.get("organizationName", "")
-        except Exception:
-            _issuer_cache[host] = None
-    return _issuer_cache[host]
-
-
-def tv_trusts(url):
-    host = urllib.parse.urlparse(url).hostname
-    org = issuer_org(host)
-    return org is not None and "Let's Encrypt" not in org
 
 
 def expires_soon(url):
@@ -98,40 +90,47 @@ def media_lines(body):
     return [l.strip() for l in body.decode("utf8", "replace").splitlines() if l.strip() and not l.startswith("#")]
 
 
-def works(url):
-    """True when the playlist, its best rendition and the newest segment all download from trusted hosts."""
-    try:
-        host = urllib.parse.urlparse(url).hostname or ""
-        if not host.endswith(OFFICIAL_HOSTS) or expires_soon(url) or not tv_trusts(url):
-            return False
-        final, body = get(url)
-        if b"#EXTM3U" not in body:
-            return False
-        text = body.decode("utf8", "replace")
-        if "#EXT-X-STREAM-INF" in text:
-            # Master playlist: follow the highest rendition up to 1080p, as the TV would.
-            best, best_h = None, -1
-            lines = text.splitlines()
-            for i, line in enumerate(lines):
-                m = re.search(r"RESOLUTION=\d+x(\d+)", line)
-                if line.startswith("#EXT-X-STREAM-INF") and i + 1 < len(lines):
-                    h = int(m.group(1)) if m else 0
-                    if best_h < h <= 1080:
-                        best, best_h = lines[i + 1].strip(), h
-            variant = urllib.parse.urljoin(final, best or media_lines(body)[0])
-            if not tv_trusts(variant):
-                return False
-            final, body = get(variant)
-        segments = media_lines(body)
-        if not segments:
-            return False
-        seg = urllib.parse.urljoin(final, segments[-1])
-        if not tv_trusts(seg):
-            return False
-        _, data = get(seg, timeout=25)
-        return len(data) > 10000
-    except Exception:
+def check(url):
+    """True when the playlist, its best rendition up to 1080p and the newest segment all download."""
+    final, body = get(url)
+    if b"#EXTM3U" not in body:
         return False
+    text = body.decode("utf8", "replace")
+    if "#EXT-X-STREAM-INF" in text:
+        best, best_h = None, -1
+        lines = text.splitlines()
+        for i, line in enumerate(lines):
+            m = re.search(r"RESOLUTION=\d+x(\d+)", line)
+            if line.startswith("#EXT-X-STREAM-INF") and i + 1 < len(lines):
+                h = int(m.group(1)) if m else 0
+                if best_h < h <= 1080:
+                    best, best_h = lines[i + 1].strip(), h
+        final, body = get(urllib.parse.urljoin(final, best or media_lines(body)[0]))
+    segments = media_lines(body)
+    if not segments:
+        return False
+    _, data = get(urllib.parse.urljoin(final, segments[-1]))
+    return len(data) > 10000
+
+
+def works(url):
+    host = urllib.parse.urlparse(url).hostname or ""
+    if not host.endswith(OFFICIAL_HOSTS) or expires_soon(url):
+        return False
+    # Two tries: the slow playlists time out now and then and answer fine moments later.
+    for _ in range(2):
+        try:
+            if check(url):
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def same_stream(a, b):
+    """Same host and path: differs only in tokens, so not a real backup."""
+    pa, pb = urllib.parse.urlparse(a), urllib.parse.urlparse(b)
+    return (pa.hostname, pa.path) == (pb.hostname, pb.path)
 
 
 def from_page(ch):
@@ -166,6 +165,27 @@ def from_iptv(ch, playlist):
     return found
 
 
+def links_for(ch, old, playlist):
+    """The channel's ordered links, and a short health report."""
+    fixed = ch["links"]
+    with ThreadPoolExecutor(8) as pool:
+        alive = list(pool.map(works, fixed))
+    extra = []
+    if ch.get("token_first") or not any(alive):
+        # A still-valid link from last time first, so tokens only change when they must.
+        seen = [u for u in old if u not in fixed] + from_page(ch) + from_iptv(ch, playlist)
+        for u in seen:
+            if not any(same_stream(u, k) for k in fixed + extra) and works(u):
+                extra.append(u)
+    links = extra + fixed if ch.get("token_first") else fixed + extra
+    report = "%d/%d known links work" % (sum(alive), len(fixed))
+    if extra:
+        report += ", %d fresh link%s" % (len(extra), "" if len(extra) == 1 else "s")
+    if not any(alive) and not extra:
+        report += ", NOTHING works from here (may be blocked outside Turkey)"
+    return links[:MAX_LINKS], report
+
+
 def main():
     state = {}
     if os.path.exists(STATE):
@@ -176,35 +196,20 @@ def main():
     except Exception:
         playlist = ""
 
-    result, report = {}, []
+    result = {}
     for ch in CHANNELS:
-        current = state.get(ch["id"])
-        candidates = []
-        for u in [ch.get("preferred"), current] + from_page(ch) + from_iptv(ch, playlist):
-            if u and u not in candidates:
-                candidates.append(u)
-        chosen = next((u for u in candidates if works(u)), None)
-        if chosen is None and current:
-            # Nothing works right now (maybe a blip on the runner); keep the last link rather than drop the tile.
-            chosen = current
-            report.append("%-9s NO WORKING LINK, kept the old one" % ch["id"])
-        elif chosen is None:
-            report.append("%-9s NO WORKING LINK, tile hidden" % ch["id"])
-        else:
-            report.append("%-9s %s %s" % (ch["id"], "same" if chosen == current else "NEW ", chosen[:90]))
-        if chosen:
-            result[ch["id"]] = chosen
+        old = state.get(ch["id"], [])
+        old = [old] if isinstance(old, str) else old
+        result[ch["id"]], report = links_for(ch, old, playlist)
+        print("%-9s %s" % (ch["id"], report))
 
-    print("\n".join(report))
     with open(STATE, "w") as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
-    tiles = [{"id": c["id"], "name": c["name"], "color": c["color"], "stream": result[c["id"]]}
-             for c in CHANNELS if c["id"] in result]
+    tiles = [{"id": c["id"], "name": c["name"], "color": c["color"], "streams": result[c["id"]]} for c in CHANNELS]
     with open(OUTPUT, "w") as f:
-        f.write("// Generated by tools/update_streams.py, which checks and repairs these links every hour.\n")
-        f.write("// Edit the channel list there, not here.\n")
+        f.write("// Generated by tools/update_streams.py. Edit the channel list there, not here.\n")
         f.write("var CHANNELS = %s;\n" % json.dumps(tiles, indent=2, ensure_ascii=False))
     return 0
 

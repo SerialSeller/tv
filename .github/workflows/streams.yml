@@ -1,5 +1,4 @@
-# Checks every channel's stream each hour and swaps in a working link when one breaks or its token
-# (NOW's) is about to expire. See tools/update_streams.py.
+# Renews NOW's token, adds fresh links for dead channels and reports link health. See tools/update_streams.py.
 name: Repair streams
 
 on:
@@ -18,9 +17,10 @@ jobs:
   streams:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Check and repair stream links
-        run: python3 tools/update_streams.py
+        shell: bash
+        run: python3 tools/update_streams.py | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
@@ -28,5 +28,9 @@ jobs:
           git add streams.json channels.js
           git diff --cached --quiet && exit 0
           git commit -m "Repair stream links"
-          git pull --rebase
-          git push
+          # GitHub occasionally answers a push with a server error; a retry gets through.
+          for attempt in 1 2 3; do
+            git pull --rebase && git push && exit 0
+            sleep 20
+          done
+          exit 1

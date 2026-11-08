@@ -32,12 +32,14 @@
   <div id="grid"></div>
 </div>
 
-<script src="channels.js"></script>
 <script>
-// Channels open in our own light player; a tile with a plain url opens that site instead.
+// A 10-minute stamp so a TV that caches aggressively still picks up repaired links.
+document.write('<script src="channels.js?t=' + Math.floor(new Date().getTime() / 600000) + '"><\/script>');
+</script>
+<script>
 var TILES = [];
 for (var c = 0; c < CHANNELS.length; c++) {
-  TILES.push({ name: CHANNELS[c].name, color: CHANNELS[c].color, url: CHANNELS[c].stream ? 'watch.html#' + CHANNELS[c].id : CHANNELS[c].url });
+  TILES.push({ name: CHANNELS[c].name, color: CHANNELS[c].color, url: 'watch.html#' + CHANNELS[c].id });
 }
 // Four big columns while the channels fit in two rows of four, five otherwise.
 var COLS = TILES.length <= 8 ? 4 : 5;
@@ -59,8 +61,7 @@ function tick() {
   setText(el('date'), d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() + ', ' + DAYS[d.getDay()]);
 }
 
-// Outside temperature in Güngören. A GitHub Action refreshes weather.json every 30 minutes, because the
-// TV rejects the weather service's own certificate but trusts github.io.
+// Outside temperature in Güngören, from weather.json on github.io, which a GitHub Action refreshes on a schedule.
 function weatherLabel(code) {
   if (code === 0) { return 'Açık'; }
   if (code <= 2) { return 'Az bulutlu'; }
