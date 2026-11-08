@@ -7,8 +7,8 @@ It does three things, from .github/workflows/streams.yml:
   2. Adds fresh links from the channel's page and the iptv-org list when every known link is dead.
   3. Reports which links work, in the job summary.
 
-GitHub's runners are outside Turkey and some channels block foreign visitors (TV8 usually, TRT 1 during
-some matches), so a failure here does not mean the link is dead for the TV. Known links are never removed.
+GitHub's runners are outside Turkey and some links may refuse foreign visitors, or simply answer slowly,
+so a failure here does not prove the link is dead for the TV. Known links are never removed.
 GitHub also runs "hourly" schedules only every 3 to 17 hours in practice, so NOW keeps a token-free backup.
 
 Usage: python3 tools/update_streams.py   (from the repo root)
