@@ -45,7 +45,7 @@ var CHANNELS = [
     "name": "NOW",
     "color": "#d4145a",
     "streams": [
-      "https://nowtv.daioncdn.net/nowtv/nowtv.m3u8?ce=3&app=65fa8997-2b2f-4529-85ea-84318628a608&st=fsO0HC5qiD7WJZCpsPhzVQ&e=1794970330",
+      "https://nowtv.daioncdn.net/nowtv/nowtv.m3u8?ce=3&app=65fa8997-2b2f-4529-85ea-84318628a608&st=6NUxChoOKKWUiQT9xBnQvA&e=1794990324",
       "https://uycyyuuzyh.turknet.ercdn.net/nphindgytw/nowtv/nowtv_720p.m3u8"
     ]
   },
